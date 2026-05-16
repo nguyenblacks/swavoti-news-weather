@@ -98,6 +98,16 @@ class SwavotiNewsApp extends Adw.Application {
             header.pack_start(logo);
             header.pack_start(new WeatherHeaderWidget());
 
+            // NEW FEATURE: Live Digital Clock
+            this.clockLabel = new Gtk.Label({ css_classes: ['clock-widget'], margin_start: 16 });
+            header.pack_start(this.clockLabel);
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                this.clockLabel.set_label(timeString);
+                return GLib.SOURCE_CONTINUE;
+            });
+
             this.updateBanner = new Gtk.Label({ label: "DOWNLOADING UPDATE...", css_classes: ['blue-text', 'bold'], visible: false });
             header.pack_start(this.updateBanner);
 

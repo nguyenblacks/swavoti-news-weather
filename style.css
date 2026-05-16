@@ -259,3 +259,14 @@ window {
   font-weight: 800;
   color: #007bff;
 }
+
+/* Clock Widget */
+.clock-widget {
+  font-family: 'Inter', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #333333;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 4px 12px;
+  border-radius: 12px;
+}

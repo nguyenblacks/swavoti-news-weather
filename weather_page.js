@@ -33,8 +33,8 @@ class WeatherPage extends Gtk.Box {
             hexpand: true
         });
 
-        // Use Windy.com for a premium visual experience
-        this.webView.load_uri('https://www.windy.com');
+        // Use weather.com for full weekly forecasts
+        this.webView.load_uri('https://weather.com');
         
         this.append(this.webView);
     }
