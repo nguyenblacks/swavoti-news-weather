@@ -129,6 +129,70 @@ export const PinterestFeed = GObject.registerClass({
         });
     }
 
+    triggerLocalAIOverview() {
+        if (!this.articles || this.articles.length === 0) {
+            console.log("No articles to summarize.");
+            return;
+        }
+
+        console.log("Generating Local AI Overview...");
+        // Aggregate titles and descriptions
+        const textToSummarize = this.articles.map(a => `${a.title}. ${a.description}`).join(" ");
+        
+        try {
+            const runnerPath = GLib.build_filenamev([GLib.get_current_dir(), 'assets', 'models', 'ai-runner']);
+            const modelPath = GLib.build_filenamev([GLib.get_current_dir(), 'assets', 'models', 'tiny-model.gguf']);
+            
+            // Execute the native C++ inference engine directly, passing the GGUF model and prompt
+            const [, stdout_fd, stderr_fd, child_pid] = GLib.spawn_async_with_pipes(
+                null, 
+                [runnerPath, '-m', modelPath, '-p', textToSummarize], 
+                null, 
+                GLib.SpawnFlags.SEARCH_PATH, 
+                null
+            );
+
+            const outStream = new Gio.UnixInputStream({ fd: stdout_fd, close_fd: true });
+            const dataStream = new Gio.DataInputStream({ base_stream: outStream });
+
+            // Read async
+            dataStream.read_line_async(GLib.PRIORITY_DEFAULT, null, (stream, res) => {
+                try {
+                    const [outBytes] = stream.read_line_finish(res);
+                    if (outBytes) {
+                        const outStr = new TextDecoder().decode(outBytes);
+                        const result = JSON.parse(outStr);
+                        if (result.summary) {
+                            this.showAIOverviewCard(result.summary);
+                        } else {
+                            console.error("AI Error:", result.error);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to read AI output", e);
+                }
+            });
+
+        } catch (e) {
+            console.error("Failed to start AI bridge", e);
+        }
+    }
+
+    showAIOverviewCard(summary) {
+        const dialog = new Adw.MessageDialog({
+            heading: "✨ Local AI Overview",
+            body: summary,
+            close_response: "ok"
+        });
+        dialog.add_response("ok", "Dismiss");
+        
+        // Find root window to attach dialog
+        let parent = this.get_root();
+        if (parent && parent instanceof Gtk.Window) {
+            dialog.present(parent);
+        }
+    }
+
     createPin(item) {
         const pin = new Gtk.Box({
             orientation: Gtk.Orientation.VERTICAL,

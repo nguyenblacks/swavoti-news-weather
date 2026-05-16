@@ -13,6 +13,11 @@ import { AlertDetailPage } from './alert_detail_page.js';
 import { AutoUpdater } from './updater.js';
 import { SettingsPage } from './settings_page.js';
 
+const Gettext = imports.gettext;
+Gettext.bindtextdomain('swavoti-news', '/usr/share/locale');
+Gettext.textdomain('swavoti-news');
+const _ = Gettext.gettext;
+
 const SwavotiNewsApp = GObject.registerClass(
 class SwavotiNewsApp extends Adw.Application {
     _init() {
@@ -26,6 +31,10 @@ class SwavotiNewsApp extends Adw.Application {
         super.vfunc_startup();
         this.loadStyles();
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT);
+        
+        // CSS provider for dynamic font scaling
+        this.fontCssProvider = new Gtk.CssProvider();
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), this.fontCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
     }
 
     loadStyles() {
@@ -59,7 +68,7 @@ class SwavotiNewsApp extends Adw.Application {
                 btn.connect('clicked', () => {
                     this.stack.set_visible_child_name(name);
                     this.updateNavHighlight(name);
-                    header.visible = (name !== 'weather');
+                    header.visible = (name !== 'weather' && name !== 'settings');
                 });
                 return btn;
             };
@@ -111,8 +120,34 @@ class SwavotiNewsApp extends Adw.Application {
             this.updateBanner = new Gtk.Label({ label: "DOWNLOADING UPDATE...", css_classes: ['blue-text', 'bold'], visible: false });
             header.pack_start(this.updateBanner);
 
+            // Search and Advanced Filters
+            const searchBox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 4 });
             this.searchEntry = new Gtk.SearchEntry({ placeholder_text: 'Search news...', hexpand: true });
-            header.set_title_widget(this.searchEntry);
+            searchBox.append(this.searchEntry);
+
+            // Advanced Filter Popover
+            const filterMenu = new Gio.Menu();
+            filterMenu.append("Sort by Date", "app.filter-date");
+            filterMenu.append("Filter by Topic", "app.filter-topic");
+            filterMenu.append("Generate AI Overview", "app.ai-overview");
+            
+            const filterPopover = Gtk.PopoverMenu.new_from_model(filterMenu);
+            const filterBtn = new Gtk.MenuButton({ 
+                icon_name: 'view-filter-symbolic', 
+                popover: filterPopover,
+                css_classes: ['flat']
+            });
+            
+            // AI Action placeholder
+            const aiAction = new Gio.SimpleAction({ name: 'ai-overview' });
+            aiAction.connect('activate', () => {
+                this.feed.triggerLocalAIOverview();
+            });
+            this.add_action(aiAction);
+
+            searchBox.append(filterBtn);
+
+            header.set_title_widget(searchBox);
             toolbarView.add_top_bar(header);
 
             this.stack = new Adw.ViewStack({ vexpand: true });
@@ -133,6 +168,51 @@ class SwavotiNewsApp extends Adw.Application {
 
             this.settingsPage = new SettingsPage();
             this.stack.add_named(this.settingsPage, 'settings');
+
+            // CSS provider for dark mode
+            this.darkCssProvider = new Gtk.CssProvider();
+
+            // Connect Settings
+            this.settingsPage.connect('dark-mode-toggled', (_, isDark) => {
+                Adw.StyleManager.get_default().set_color_scheme(
+                    isDark ? Adw.ColorScheme.FORCE_DARK : Adw.ColorScheme.FORCE_LIGHT
+                );
+                
+                if (isDark) {
+                    const darkCssPath = GLib.build_filenamev([GLib.get_current_dir(), 'style.dark.css']);
+                    if (GLib.file_test(darkCssPath, GLib.FileTest.EXISTS)) {
+                        this.darkCssProvider.load_from_path(darkCssPath);
+                        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), this.darkCssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
+                    }
+                } else {
+                    Gtk.StyleContext.remove_provider_for_display(Gdk.Display.get_default(), this.darkCssProvider);
+                }
+            });
+
+            this.settingsPage.connect('font-size-changed', (_, sizeStr) => {
+                let sizeCss = "14px";
+                if (sizeStr === "Small") sizeCss = "12px";
+                if (sizeStr === "Large") sizeCss = "18px";
+                if (sizeStr === "Extra Large") sizeCss = "22px";
+                
+                this.fontCssProvider.load_from_data(`* { font-size: ${sizeCss}; }`, -1);
+            });
+
+            this.settingsPage.connect('language-changed', (_, langStr) => {
+                // In a true OS integration, this would set LC_ALL or update system env.
+                // For demonstration of native gettext interaction:
+                const langCodes = { "English": "en_US.UTF-8", "Spanish": "es_ES.UTF-8", "French": "fr_FR.UTF-8", "Zulu": "zu_ZA.UTF-8" };
+                const code = langCodes[langStr] || "en_US.UTF-8";
+                GLib.setenv("LANGUAGE", code, true);
+                console.log(`System native translation locale switched to: ${code}`);
+                // Note: Gettext requires app restart to pull new locale dictionaries into GTK.
+                this.updateBanner.set_label(`LOCALE UPDATED TO ${langStr.toUpperCase()} (RESTART REQUIRED)`);
+                this.updateBanner.visible = true;
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
+                    this.updateBanner.visible = false;
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
 
             toolbarView.set_content(this.stack);
 
