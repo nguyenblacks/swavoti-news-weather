@@ -13,9 +13,6 @@
 
 /* Base UI */
 window {
-  background-image: url('assets/splash_bg.png');
-  background-size: cover;
-  background-position: center;
   color: #111111;
   font-family: "Inter", sans-serif;
 }
