@@ -18,8 +18,9 @@ export const NewsArticle = GObject.registerClass({
     _init(data = {}) {
         super._init();
         this.title = data.title || 'Untitled';
-        this.author = data.author || 'Enterprise Desk';
-        this.date = data.pubDate ? new Date(data.pubDate).toLocaleDateString() : 'Today';
+        // Removed the "Enterprise Desk" placeholder. Falls back to empty if no author is in the feed.
+        this.author = data.author || '';
+        this.date = data.pubDate ? new Date(data.pubDate).toLocaleDateString() : '';
         this.image_url = data.thumbnail || data.enclosure?.link || '';
         this.link = data.link || '';
     }
@@ -44,36 +45,10 @@ export const EnterpriseNewsFeed = GObject.registerClass({
         this._session = new Soup.Session();
         this._model = new Gio.ListStore({ item_type: NewsArticle });
 
-        this._buildHeader();
         this._buildFilterBar();
         this._buildGrid();
 
         this.fetchNews('Top Stories');
-    }
-
-    _buildHeader() {
-        const header = new Adw.HeaderBar({
-            title_widget: new Gtk.Label({
-                label: 'Enterprise Hub',
-                css_classes: ['title-1']
-            })
-        });
-
-        const refreshBtn = new Gtk.Button({
-            icon_name: 'view-refresh-symbolic',
-            tooltip_text: 'Refresh Feed'
-        });
-        refreshBtn.connect('clicked', () => this.fetchNews(this._currentCategory || 'Top Stories'));
-        header.pack_end(refreshBtn);
-
-        const searchEntry = new Gtk.SearchEntry({
-            placeholder_text: 'Search feeds...',
-            width_request: 200
-        });
-        searchEntry.connect('activate', (entry) => this.fetchNews(entry.get_text()));
-        header.pack_start(searchEntry);
-
-        this.append(header);
     }
 
     _buildFilterBar() {
@@ -201,6 +176,9 @@ export const EnterpriseNewsFeed = GObject.registerClass({
             title.set_label(item.title);
             author.set_label(item.author);
             date.set_label(item.date);
+
+            // Hide the author label entirely if the feed didn't provide one to avoid empty gaps
+            author.set_visible(!!item.author);
 
             // Thumbnail image handling with fallback styling
             if (item.image_url && item.image_url.startsWith('http')) {
