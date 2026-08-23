@@ -8,7 +8,6 @@ import Gettext from 'gettext';
 import system from 'system';
 
 import { WeatherHeaderWidget } from './weatherinfo.js';
-// FIXED: Import PinterestFeed as default export to resolve "ambiguous indirect export"
 import { EnterpriseNewsFeed } from './pinterest_feed.js';
 import { WeatherPage } from './weather_page.js';
 import { ArticleReader } from './article_reader.js';
@@ -143,7 +142,11 @@ class SwavotiNewsApp extends Adw.Application {
             // AI Action placeholder
             const aiAction = new Gio.SimpleAction({ name: 'ai-overview' });
             aiAction.connect('activate', () => {
-                this.feed.triggerLocalAIOverview();
+                if (typeof this.feed.triggerLocalAIOverview === 'function') {
+                    this.feed.triggerLocalAIOverview();
+                } else {
+                    console.log("AI Overview method not yet implemented in EnterpriseNewsFeed.");
+                }
             });
             this.add_action(aiAction);
 
