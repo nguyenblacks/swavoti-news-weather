@@ -4,6 +4,8 @@ import Adw from 'gi://Adw?version=1';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gdk from 'gi://Gdk';
+import Gettext from 'gettext';
+import system from 'system';
 
 import { WeatherHeaderWidget } from './weatherinfo.js';
 import { PinterestFeed } from './pinterest_feed.js';
@@ -13,7 +15,6 @@ import { AlertDetailPage } from './alert_detail_page.js';
 import { AutoUpdater } from './updater.js';
 import { SettingsPage } from './settings_page.js';
 
-const Gettext = imports.gettext;
 Gettext.bindtextdomain('swavoti-news', '/usr/share/locale');
 Gettext.textdomain('swavoti-news');
 const _ = Gettext.gettext;
@@ -199,13 +200,10 @@ class SwavotiNewsApp extends Adw.Application {
             });
 
             this.settingsPage.connect('language-changed', (_, langStr) => {
-                // In a true OS integration, this would set LC_ALL or update system env.
-                // For demonstration of native gettext interaction:
                 const langCodes = { "English": "en_US.UTF-8", "Spanish": "es_ES.UTF-8", "French": "fr_FR.UTF-8", "Zulu": "zu_ZA.UTF-8" };
                 const code = langCodes[langStr] || "en_US.UTF-8";
                 GLib.setenv("LANGUAGE", code, true);
                 console.log(`System native translation locale switched to: ${code}`);
-                // Note: Gettext requires app restart to pull new locale dictionaries into GTK.
                 this.updateBanner.set_label(`LOCALE UPDATED TO ${langStr.toUpperCase()} (RESTART REQUIRED)`);
                 this.updateBanner.visible = true;
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, () => {
@@ -279,4 +277,5 @@ class SwavotiNewsApp extends Adw.Application {
 });
 
 const app = new SwavotiNewsApp();
-app.run([GLib.get_prgname()].concat(ARGV));
+// FIX: GLib.get_prgname() can be null. Provide a fallback string so concat() doesn't crash.
+app.run([GLib.get_prgname() || 'swavoti-news'].concat(system.programArgs));
