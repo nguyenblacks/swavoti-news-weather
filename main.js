@@ -154,7 +154,7 @@ class SwavotiNewsApp extends Adw.Application {
 
             this.stack = new Adw.ViewStack({ vexpand: true });
             
-            this.feed = new PinterestFeed();
+            this.feed = new EnterpriseNewsFeed();
             const feedScrolled = new Gtk.ScrolledWindow({ vexpand: true });
             feedScrolled.set_child(this.feed);
             this.stack.add_named(feedScrolled, 'news');
