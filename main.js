@@ -8,7 +8,8 @@ import Gettext from 'gettext';
 import system from 'system';
 
 import { WeatherHeaderWidget } from './weatherinfo.js';
-import { PinterestFeed } from './pinterest_feed.js';
+// FIXED: Import PinterestFeed as default export to resolve "ambiguous indirect export"
+import PinterestFeed from './pinterest_feed.js';
 import { WeatherPage } from './weather_page.js';
 import { ArticleReader } from './article_reader.js';
 import { AlertDetailPage } from './alert_detail_page.js';
@@ -277,5 +278,5 @@ class SwavotiNewsApp extends Adw.Application {
 });
 
 const app = new SwavotiNewsApp();
-// FIX: GLib.get_prgname() can be null. Provide a fallback string so concat() doesn't crash.
+// FIX: Fallback string prevents crashing when GLib.get_prgname() evaluates to null
 app.run([GLib.get_prgname() || 'swavoti-news'].concat(system.programArgs));
