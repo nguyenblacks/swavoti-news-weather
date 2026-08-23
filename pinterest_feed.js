@@ -12,13 +12,18 @@ export const NewsArticle = GObject.registerClass({
         'author': GObject.ParamSpec.string('author', 'Author', 'Article author', GObject.ParamFlags.READWRITE, ''),
         'date': GObject.ParamSpec.string('date', 'Date', 'Publication date', GObject.ParamFlags.READWRITE, ''),
         'image-url': GObject.ParamSpec.string('image-url', 'ImageUrl', 'Thumbnail URL', GObject.ParamFlags.READWRITE, ''),
-        'link': GObject.ParamSpec.string('link', 'Link', 'Article URL', GObject.ParamFlags.READWRITE, '')
+        'link': GObject.ParamSpec.string('link', 'Link', 'Article URL', GObject.ParamFlags.READWRITE, ''),
+        'is-loading': GObject.ParamSpec.boolean('is-loading', 'IsLoading', 'Is it a skeleton loader', GObject.ParamFlags.READWRITE, false)
     }
 }, class NewsArticle extends GObject.Object {
     _init(data = {}) {
         super._init();
+        this.is_loading = data.is_loading || false;
+        
+        // If it's just a loading skeleton, skip the rest
+        if (this.is_loading) return;
+
         this.title = data.title || 'Untitled';
-        // Removed the "Enterprise Desk" placeholder. Falls back to empty if no author is in the feed.
         this.author = data.author || '';
         this.date = data.pubDate ? new Date(data.pubDate).toLocaleDateString() : '';
         this.image_url = data.thumbnail || data.enclosure?.link || '';
@@ -156,7 +161,9 @@ export const EnterpriseNewsFeed = GObject.registerClass({
             const gesture = new Gtk.GestureClick();
             gesture.connect('pressed', () => {
                 const item = list_item.get_item();
-                if (item) this.emit('article-selected', item);
+                if (item && !item.is_loading) {
+                    this.emit('article-selected', item);
+                }
             });
             card.add_controller(gesture);
 
@@ -173,20 +180,38 @@ export const EnterpriseNewsFeed = GObject.registerClass({
             const date = author.get_next_sibling();
             const title = metaBox.get_next_sibling();
 
-            title.set_label(item.title);
-            author.set_label(item.author);
-            date.set_label(item.date);
-
-            // Hide the author label entirely if the feed didn't provide one to avoid empty gaps
-            author.set_visible(!!item.author);
-
-            // Thumbnail image handling with fallback styling
-            if (item.image_url && item.image_url.startsWith('http')) {
-                image.set_file(Gio.File.new_for_uri(item.image_url));
-                image.remove_css_class('no-image-placeholder');
-            } else {
+            if (item.is_loading) {
+                // Apply Shimmer/Skeleton state
                 image.set_paintable(null);
-                image.add_css_class('no-image-placeholder');
+                image.add_css_class('skeleton');
+                image.remove_css_class('no-image-placeholder');
+                
+                title.set_label('██████████████████\n██████████'); // Invisible text blocks to force height
+                title.add_css_class('skeleton-text');
+                
+                author.set_label('████████');
+                author.add_css_class('skeleton-text');
+                author.set_visible(true);
+                
+                date.set_label('');
+            } else {
+                // Apply Real Data state
+                image.remove_css_class('skeleton');
+                title.remove_css_class('skeleton-text');
+                author.remove_css_class('skeleton-text');
+
+                title.set_label(item.title);
+                author.set_label(item.author);
+                date.set_label(item.date);
+                author.set_visible(!!item.author);
+
+                if (item.image_url && item.image_url.startsWith('http')) {
+                    image.set_file(Gio.File.new_for_uri(item.image_url));
+                    image.remove_css_class('no-image-placeholder');
+                } else {
+                    image.set_paintable(null);
+                    image.add_css_class('no-image-placeholder');
+                }
             }
         });
 
@@ -215,6 +240,10 @@ export const EnterpriseNewsFeed = GObject.registerClass({
     async fetchNews(query = "Top Stories") {
         this._model.remove_all();
 
+        // 1. Add 8 skeleton items to show the shimmer effect while loading
+        const skeletons = Array(8).fill(0).map(() => new NewsArticle({ is_loading: true }));
+        this._model.splice(0, 0, skeletons);
+
         const rssUrl = encodeURIComponent(`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`);
         const url = `https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`;
         const msg = Soup.Message.new('GET', url);
@@ -235,10 +264,14 @@ export const EnterpriseNewsFeed = GObject.registerClass({
 
             if (json.items) {
                 const articles = json.items.map(item => new NewsArticle(item));
-                this._model.splice(0, 0, articles);
+                
+                // 2. Swap out the skeletons for the real articles
+                this._model.splice(0, skeletons.length, articles);
             }
         } catch (e) {
             console.error('Failed to fetch enterprise news:', e.message);
+            // If it fails, you might want to clear the skeletons:
+            this._model.remove_all();
         }
     }
 });
