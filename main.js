@@ -9,7 +9,7 @@ import system from 'system';
 
 import { WeatherHeaderWidget } from './weatherinfo.js';
 // FIXED: Import PinterestFeed as default export to resolve "ambiguous indirect export"
-import PinterestFeed from './pinterest_feed.js';
+import { EnterpriseNewsFeed } from './pinterest_feed.js';
 import { WeatherPage } from './weather_page.js';
 import { ArticleReader } from './article_reader.js';
 import { AlertDetailPage } from './alert_detail_page.js';
